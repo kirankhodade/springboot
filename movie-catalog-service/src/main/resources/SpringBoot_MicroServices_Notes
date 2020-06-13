@@ -1,3 +1,89 @@
+Spring-Boot Notes : 
+
+What is Spring?
+	Its complete Application framework.(Not just dependency Injection)
+	It provides programming & configuration model(through annotations & xml)
+	It provides Infrastructure support(Connecting to Database, messaging queues etc.)
+	
+Problems with Spring?
+	It's now become a huge framework.(So it can be a version maintenance nightmare (for eg: Spring 4 does not work with one version of log4j but works with other.)).
+	Multiple set-up steps are required.
+	Multiple configurations steps are required.
+	Multiple build and deploy steps.
+	
+	Note: 
+		1. In a nut-shell spring gives us lots of features and flexibility, so to make spring do what we exactly want can be a substantial task.(i.e. multiple configs, setups etc.)
+		2. Because spring offers lots of features there is no clear starting point OR standard guideline which says this is the best way to do it, Through trial and error we arrive at the best choice.
+
+
+What is SpringBoot?
+	SpringBoot makes it easy to create stand-alone, production grade spring based applications 
+	that you can "just run".
+
+SpringBoot Characteristics :
+	SpringBoot is an Opinionated framework.
+	SpringBoot prefers convention over configuration.(It will work for 80% use-cases as is, only for 20% unique use-cases you may go for configuration)
+	SpringBoot application created is a stand-alone application.
+	SpringBoot application created are production ready.
+	
+Writing SpringBoot Application : 
+	1. Get dependencies sorted in pom.xml or build.gradle
+		example pom.xml entry : 
+			 <parent>
+				  <groupId>org.springframework.boot</groupId>
+				  <artifactId>spring-boot-starter-parent</artifactId>
+				  <version>1.4.2.RELEASE</version>
+			  </parent>
+			  <dependencies>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-web</artifactId>
+					</dependency>  
+			  </dependencies>
+			  
+		example build.gradle entry.
+			plugins {
+				id 'org.springframework.boot' version '2.3.0.RELEASE'
+				id 'io.spring.dependency-management' version '1.0.9.RELEASE'
+				id 'java'
+				id 'war'
+			}
+			
+			dependencies {
+				implementation 'org.springframework.boot:spring-boot-starter-web'
+				providedRuntime 'org.springframework.boot:spring-boot-starter-tomcat'
+				testImplementation('org.springframework.boot:spring-boot-starter-test') {
+					exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
+				}
+			}
+	2. In main application class use @SpringBootApplication and execute static run() method of SpringApplication class.
+		example : 
+			@SpringBootApplication
+			public class DemoApplication {
+				public static void main(String[] args) {
+					SpringApplication.run(DemoApplication.class, args);
+				}
+			}
+	
+	3. Thats all is required, Once we run our application class as normal java application foll. things happen : 
+		SpringBoot sets-up default configuration.
+		Starts Spring Application context.
+		Performs classpath scan.
+		Starts tomcat server.
+		
+Bill Of Materials : 
+	Pre-set combinations, list of jar that work well together, is referred to as Bill of Materials by spring.
+	What it means is we just pick parent version of spring boot, then Spring Boot automatically takes care of other versions of jars that work well together with it.
+	
+Different ways to create Spring boot application : 
+	 Spring Initializr
+	 Using Spring Boot CLI
+	 using STS(Spring Tools Suite) IDE
+	 Using application.properties(For Customizing the defaults used by spring boot)
+
+***************************************************************************************************************************************************************************************
+Spring-Boot Micro Services :
+
 Monolithic Architecture : 
 	Problems we face and solve in monolithic application are mostly very specific to the application we are building.
 	Complexity is hidden within application.
