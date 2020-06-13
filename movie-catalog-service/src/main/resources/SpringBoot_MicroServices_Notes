@@ -1,0 +1,668 @@
+Monolithic Architecture : 
+	Problems we face and solve in monolithic application are mostly very specific to the application we are building.
+	Complexity is hidden within application.
+
+Micro-services Architecture
+	Provides : scalability, modularity in code and deployments. 
+	
+	No matter what the underlying applications we are building as long as we have broken that application into micro-services,
+	Problems we face and solve between different Microservices are common problems. 
+	eg: load-balancing
+	And if problems are common then there are frameworks/technologies that solve this problems, which is an advantage.
+	Complexity is between micro-services.
+
+How to manage complexity?
+	Patterns : Make micro-services work well together. eg: service-discovery pattern.
+	Technologies : Use libraries and frameworks to solve common problems. eg: Edureka provides service-discovery implementations.
+	
+What is the difference between micro-service and web-service(SOA - Service Oriented Architecture)?
+	SOA : Lot's of SOA web-services are built with a view of creating a utility and not any particular application in mind.eg: Iplocator webservice, Stock quote webservice.
+		  These utilities can be used by many application as they need. We get reusability.
+		  SOA has in-built complexity, Because we don't know how & which application will use the service, we have strict contracts(eg:wsdl) and enterprise buses etc.
+	
+	Micro-service :
+			A specific application is broken into micro-services.eg: Amazon, Uber etc.
+			Micro-services are written with specific application in mind. 
+			Micro-services can be potentially reused, but they are not designed to be re-used and are designed for specific application.
+			Each Microservice have their own databases.  
+
+
+
+Example : 
+	Build Movie Catalog API Application
+		movie-info-service{
+			input : movieId
+			output : Movie list
+		}
+		ratings-data-service{
+			input : userId
+			output : movieIds and ratings
+		}
+		movie-catalog-service{
+			input : userId
+			output : All Movie list with their rating details for a user.
+		}
+		
+How to make Rest call from code?
+	Calling Rest APIs programatically.
+	Using a Rest Client library
+	SpringBoot comes with a client already in your classpath - RestTemplate.		
+	
+	Steps to use RestTemplate :
+	1. Expose the RestTemplate Bean :
+		@Bean
+		public RestTemplate getRestTemplate() {
+			return new RestTemplate();
+		}
+	2. Call the API using RestTemplate
+		Movie movie = restTemplate.getForObject("http://localhost:8082/movies/"+rating.getMovieId(), Movie.class);
+	
+	Note : RestTemplate will be deprecated in future, WebClient will be used which is part of Reactive programming which helps us make Asynchronous calls.
+	
+	Steps to use WebClient :
+	1. Dependency for reactive programming : 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+	2. Expose the WebClient Bean :
+		@Bean
+		public WebClient.Builder getWebClientBuilder(){
+			return WebClient.builder();
+		}
+	3. Call the API using WebClient
+		  Movie movie = webClientBuilder.build() //gives the Webclient object
+									    .get() //type of http request(GET, POST, PUT etc..)
+									    .uri("http://localhost:8082/movies/"+rating.getMovieId()) //Rest API URI
+										.retrieve() //fetch the response
+										.bodyToMono(Movie.class) //this line makes asynchronous call, means we will get Movie class object in future.
+										.block(); //block is useful if we want our container to wait until the api response comes.
+	
+Why should we avoid returning lists in APIs?
+	1. If we want to return some additional data along with list, then list return type would need to be changed to some other object type which will have list and the new parameter.
+	   This means new API is not backward compatible and all the clients code, using List return type will start breaking.
+	   Therefore instead of List we should always return Object Wrapper type. so even if there are new changes in object, clients will just ignore it and will not break their code.
+	2. In client code there is now way to get List<Rating>, refer below thing is not possible : 
+		//List<Rating> ratingslist = restTemplate.getForObject("http://localhost:8082/ratingsdata/users/"+userId, List<Rating>.class); //CompileTimeError
+	
+	Solution to above problem is to use Wrapper Class that encapsulates the List.
+	
+Why hard-coded urls are bad?
+	Changes require code updates.
+	Dynamic urls are generated in cloud environment, which url will we configure.
+	Load balancing cannot be done if urls are hard-coded.
+	Multiple environments(test, stage, Prod etc.) cannot be maintained if urls are hard-coded
+	
+Service Discovery Pattern: 
+	When micro-services talk to each-other they discover each-other through service discovery.
+	
+	Client Side Discovery : Client does all the work, hence known as Client side discovery pattern.
+	1. Client calls Discovery_Server, I need Service 2
+	2. Discovery_Server returns the Url for Service 2
+	3. Client calls Service 2
+		
+		                              ---> Service 1
+		                              |
+		Client ---> Discovery_Server-----> Service 2
+		                              |
+		                              ---> Service 3
+	
+	Dis-advantage : This model, Seems bit chatty.. as extra hops are introduced due to chat between client and discovery server.
+	
+	Server Side Discovery : Server does all the work, hence known as Server side discovery pattern.
+	1. Client calls Discovery_Server, and says can you tell service 2 i said high. 
+	2. Discovery_Server says to Service 2, that client says hi.
+	3. Service 2 returns response.
+	4. No extra hops are done in this model.
+		
+		                              ---> Service 1
+		                              |
+		Client ---> Discovery_Server-----> Service 2
+		                              |
+		                              ---> Service 3
+	
+	service discovery pattern : Spring Boot + Spring cloud framework uses client-side service discovery pattern.
+	Technology provided by spring to achieve service discovery pattern : Eureka
+	Spring Boot/Spring cloud provides an abstraction layer over underlying technologies(like : eureka, hysterix, ribbion, zuul etc. Netflix is pioneer in the underlying technologies)
+	
+	
+	Steps to implement Eureka service discovery : 
+											   @EnableEurekaClient
+		                                       Eureka-Clients
+@EnableEurekaClient	  @EnableEurekaServer -----> Service 1
+   Eureka-Client            Eureka-Server |
+		  Client ------> Discovery_Server -----> Service 2
+		                                  |
+		                                  -----> Service 3
+	
+	Steps : 
+	1. Start-up Eureka Server
+		a.	Make sure POM.xml has below entries added : 
+				<properties>
+					<spring-cloud.version>Hoxton.SR5</spring-cloud.version>
+				</properties>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+				</dependency>
+				<dependencyManagement>
+					<dependencies>
+						<dependency>
+							<groupId>org.springframework.cloud</groupId>
+							<artifactId>spring-cloud-dependencies</artifactId>
+							<version>${spring-cloud.version}</version>
+							<type>pom</type>
+							<scope>import</scope>
+						</dependency>
+					</dependencies>
+				</dependencyManagement>
+		b.	annotate main spring-boot class with : @EnableEurekaServer 
+		c.	add below properties in application.properties
+				server.port=8761
+				eureka.client.register-with-eureka=false
+				eureka.client.fetch-registry=false		
+	2. Have micro-services register(Publish eg:movie-catalog-service) using Eureka client.
+		a.	Make sure POM.xml has below entries added : 
+				<properties>
+					<spring-cloud.version>Hoxton.SR5</spring-cloud.version>
+				</properties>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+				</dependency>
+				<dependencyManagement>
+					<dependencies>
+						<dependency>
+							<groupId>org.springframework.cloud</groupId>
+							<artifactId>spring-cloud-dependencies</artifactId>
+							<version>${spring-cloud.version}</version>
+							<type>pom</type>
+							<scope>import</scope>
+						</dependency>
+					</dependencies>
+				</dependencyManagement>
+		b.	annotate main spring-boot class with : @EnableEurekaClient 
+		c.	add below properties in application.properties
+				server.port=8081
+				spring.application.name=movie-catalog-service
+		d. In main spring-boot class create below method:
+				@Bean
+				@LoadBalanced
+				public RestTemplate getRestTemplate() {
+					return new RestTemplate();
+				}
+				
+				@LoadBalanced annotation in publish is performing 2 tasks : 
+					a. Service discovery.(i.e. fetch end-point url of movie-info-service or ratings-data-service from Eureka Server )
+					b. Client side load balancing.
+						eg: Suppose we have 2 instances of movie-info-service running.
+						    first @LoadBalanced will execute pt. a, Eureka server will return 2 endpoints for movie-info-service.
+						    @LoadBalanced based on internal load-balancing algo. of springboot will decide which of 2 endpoints to call this is known as client side load balancing.
+	3. Have micro-services locate(consume eg:movie-info-service, ratings-data-service) using Eureka client.
+		a & b points are same as in point-2 above.
+		c.	
+			movie-info-service : 
+			server.port=8082
+			spring.application.name=movie-info-service
+			
+			ratings-data-service : 
+			server.port=8083
+			spring.application.name=ratings-data-service
+****************************************************************************************************************************************************************************************************			
+MicroServices : Fault Tolerance and Resilience :
+   
+What is ?
+Fault Tolerance : Given an application if there is a fault, then wht is the impact of that fault. How much tolerance does a system have for a specific fault.
+eg :  If fault occurs does the whole micro-service goes down or only that particular functionality whr fault occured goes down or we handle the fault and app is up for next request.
+
+Resilience : How many faults a system can tolerate before its brought to its knees, Is known as resilience of a system.
+			 Part of Resilience is also how	much a system can bounce back from a fault.	
+	
+	
+Issues with micro-services?
+Q. micro-service instance goes down? 
+Ans : Run multiple instances of micro-serivces.
+
+Q. micro-service instance is slow? 
+		                                            ---> movie-info-service -----> movie-db-org
+		                                            |
+		movie-catalog-service ---> Discovery_Server-|
+		                                            |
+		                                            ---> rating-data-service
+		                                            
+		Assume movie-db-org service is slow, so its expected any new requests for movie-info-service will be slow.
+		we come to know after some time that even rating-data-service is slow? what might be causing rata-data-service to slow-down as it does not depend on movie-db-org slow-path.
+		
+		Root cause is Threads in webserver. 
+		Generally server maintains thread-pool, when new request comes thread is assigned when work is done and response is prepared than thread is claimed by servers threads pool.
+		As long as rate of new in-coming requests is slower than the pace at which threads are getting free its fine, but when this condition does not hold up 
+		then eventually server runs out of threads to service the new requests and then slow path(movie-info-service) as well as normal path(rating-data-service) services become slow.
+		
+Ans : 
+		We can increase the resources but that's not a long-term solution.
+		We can use service timeouts to resolve this issue, by setting timeouts on SpringRestTemplate.
+			eg : 
+				@Bean
+				@LoadBalanced
+				public RestTemplate getRestTemplate() {
+					HttpComponentsClientHttpRequestFactory request = new HttpComponentsClientHttpRequestFactory();
+					request.setConnectTimeout(3000);
+					return new RestTemplate(request);
+				}
+				This approach solves the problem for some-time as no thread will wait for longer than 3-seconds.
+				But what if in-coming requests are greater than threads becoming free in 3seconds, again we will
+				face same problem as above and eventually all threads will be consumed and system will become slow.
+				So just setting the timeout or shortening the timeout will not resolve the issue.		
+		 
+		We can use Circuit breaker pattern.
+		
+		What is circuit Breaker?
+		defn : Its basic function is to interrupt current flow, after fault is detected.
+		Unlike a fuse, which operates once and then must be replaced, 
+		a circuit breaker can be reset(either manually or automatically) to resume normal operation.
+		
+		Micro-services circuit breaker pattern steps : 
+		1. Detect something is wrong.
+		2. Take temporary steps to avoid the situation getting worse.
+		3. Deactivate the "problem" component so that it doesn't affect downstream components.
+		
+		We can technically apply circuit breaker to any micro-service thats calling other micro-service.
+		eg: movie-catalog-service, movie-info-service
+		
+		Circuit breaker parameters.	
+			When does a circuit trip?
+				Last n requests to consider for a decision?
+				How many of those 'n' requests should fail?
+				What should be Timeout duration after which we mark that request as failure?
+			
+			When does circuit gets back to normal?
+				How long should we wait(i.e. Sleep_window) after the circuit has tripped, to try again?(we wait before we try, because worst thing we can do is hit refresh, when service is already slow.)
+			
+			What to do when circuit breaks?
+				we need to have a fallback mechanism.
+				Options : 
+							a. Throw an error.
+							b. Return a fallback "default" response.
+							c. Save the previous responses(cache) and use that when possible. 		
+				
+		Why use circuit breakers?
+			failing fast: When some-thing is taking time we are failing fast, this adds resilience and fault tolerance in our system.
+			fallback functionality.
+			Automatic recovery : i.e. after sleep_window timeout, we try again to see if service is up.
+			
+Hystrix :
+	Open source library originally created by Netflix.
+	Implements circuit breaker pattern so you don't have to.
+	Give it the configuration parameters and it does the work.
+	Works well with spring boot.(eg: Netflix itself uses spring boot implementation of Hystrix)
+	
+	Note : Hystrix is in maintenence mode now because goals that were set for Hystrix project have been achieved.
+		   People are moving towards adaptive circuit breaker parameters based technologies, but Hystrix will be around for some-time in foreseeable future.
+		
+	Steps to Add Hystrix to Spring Boot application : 
+		1. Add the maven spring-cloud-starter-netflix-hystrix dependency.
+		2. Add @EnableCircuitBreaker to the application class.
+		3. Add @HystrixCommand to the methods that need circuit breakers.
+		4. Configure Hystrix behaviour.	
+		
+	How does Hystrix work?
+		In our API class on a method we use : @HystrixCommand annotation. What Hystrix does is wrap our api class with a proxy class.
+		So when some-one says give me instance of our api class, what they actually get is an instance of a proxy class.
+		this proxy class is required, for us to use Hystrix circuit breaker pattern.
+		
+		eg: Suppose we are calling @HystrixCommand annotated method from the same class in which it is defined then hystrix will not work, as it will not use proxy class.
+		solution : define @HystrixCommand methods in another class and then on that class object call @HystrixCommand methods, then Hystrix concept works.
+		
+	Hystrix Parameters : 
+		@HystrixCommand(fallbackMethod="getFallbackCatalogItem", 
+			commandProperties= {
+				@HystrixProperty(name="execution.isolation.thread.timeoutInMilliseconds", value="2000"),
+				@HystrixProperty(name="circuitBreaker.requestVolumeThreshold", value="5"),
+				@HystrixProperty(name="circuitBreaker.errorThresholdPercentage", value="50"),
+				@HystrixProperty(name="circuitBreaker.sleepWindowInMilliseconds", value="5000")		
+			}
+		)
+		
+	Hystrix Dashboard :
+		Step to set-up dashboard : 
+		1. Add dependency 
+				<properties>
+					<spring-cloud.version>Hoxton.RELEASE</spring-cloud.version>
+				</properties>
+				<dependency>
+					<groupId>org.springframework.cloud</groupId>
+					<artifactId>spring-cloud-starter-netflix-hystrix-dashboard</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-actuator</artifactId>
+				</dependency>
+		2. Add @EnableHystrixDashboard to the application class.
+		3. Add management.endpoints.web.exposure.include=* in application.properties file.
+		
+	The Bulkhead Pattern : 
+	The term comes from ship building. Ships at bottom have different compartments which are water-tight.So that even if water enters any-one compartment others are not affected.
+	In spring-boot, we can create this bulkhead by creating a fixed size thread pool for each method, so that when failure occurs others services have there threads which keep on servcing them.
+	
+	eg: Above method add : 
+			@HystrixCommand(
+			fallbackMethod="getFallbackCatalogItem", 
+			threadPoolKey = "movieInfoPool", -----> creates new thread-pool(i.e. separate bulk-head)
+			threadPoolProperties = {
+					@HystrixProperty(name="coreSize", value="20"),  ---> At-most at any given time, maximum of 20 threads can execute concurrently on this threadPoolKey.
+					@HystrixProperty(name="maxQueueSize", value="10"), ---> At-most at any given time, maximum of 10 threads can wait in queue on this threadPoolKey.
+			})
+****************************************************************************************************************************************************************************************************
+Micro-Services : Configuration Management
+
+	Example configuration : 
+		Database connections.
+		credentials(Tiaa, API userName/Password etc)
+		feature flags.
+		Business logic configurations parameters.
+		Scenario Testing(AB testing)
+		Spring Boot Configuration.
+	
+	Configs are done in : xml files, properties files, YAML files, JSON files
+	
+	Goal of configuration management is :
+		Externalized from application logic. (eg: Property Files)
+		Environment Specific.(DEV, TEST, PROD) (eg: Spring Profiles)
+		Consistent : across multiple micro-services. (eg: Spring cloud config server )
+		Version history. (GIT Repo source)
+		Real time management.
+					
+	Using external property sources with spring-boot.
+		1. We can override property in application.properties file in jar, by creating new application.properties in directory where jar is present and overriding the property.
+		2. We can also override the property in jar file directory by passing it in command-line while running the jar file.
+			eg: cmd> C:\Users\HP\Desktop>java -jar spring-boot-config-0.0.1-SNAPSHOT.jar --app.desc="Welcome to ${app.name} from Command-line"
+		
+		DOCS to explore further : https://docs.spring.io/spring-boot/docs/current/reference/html/spring-boot-features.html#boot-features-external-config
+		
+	Reading from application.properties file.
+		To read a value from properties file use @Value("${propertyName}") in your java class.
+		
+		In property file we can embed 1 property in another.
+			   eg : app.name=MyApp
+					app.desc=Welcome to ${app.name}
+		
+		For @Value("${propertyName}" , If we don't have  propertyName defined in properties file, then we will get bean creation exception and Spring-boot application won't start.
+		To get around this we can specify default value for property file, eg: @Value("${propertyName:defaultValue}"
+		So if property is not present in property file then default value will be used and exception is not thrown.
+		
+		We can define list & map in properties file and read it in code in 1 shot.
+			eg : 
+					application.properties
+						my.list.values=One,Two,Three
+						my.switches={si_grouping:'true',si_checkmarx:'false', si_snowball:'true'}
+						
+					Code : 
+						@Value("${my.list.values}")
+						private List<String> myList;
+						
+						@Value("#{${my.switches}}")  // # is from Spring Expression Language.
+						private Map<String,String> mySwitches;
+						
+	
+	@ConfigurationProperties : 
+		creates a spring bean and populates all the property values.
+		we get type checking safety at application start-up time.
+		
+		eg: 
+		
+			application.properties
+				db.connection={connectionstring:'http://www.mysql.com', userName:'root', password:'pass'}
+				db.host=120.0.0.123
+				db.port=3005
+				
+			@Configuration  //Exposes this as Bean, so that it can be Autowired.
+			@ConfigurationProperties("db") //all the properties prefixed with db will be picked-up by this bean.
+			public class DBSettings {
+				String connection;
+				String host;
+				int port;
+				
+				public String getConnection() {return connection;}
+				public void setConnection(String connection) {this.connection = connection;}
+				public String getHost() {return host;}
+				public void setHost(String host) {this.host = host;}
+				public int getPort() {return port;}
+				public void setPort(int port) {this.port = port;}
+			}
+			
+	When to use @Value vs @ConfigurationProperties?
+		If we have 1-0ff property or usage then we should go for @Value
+		
+		Benefits of using @Configuration properties are 2-fold : 
+			we can group values together. eg: db
+			This ends up as a bean, so if you require same properties at multiple places makes sense to expose it as bean which @ConfigurationProperties does.
+	
+	Spring-boot actuator: http://localhost:8080/actuator/configprops : exposes all the configuration properties.
+		
+
+YAML : has 2 names : Yet Another Markup Language OR YAML Ain't Markup Language.
+	YAML support concept of nesting property names.
+	Save the property file with .yml extenstion.
+	
+	eg: 
+		app: 
+			name: MyApp
+			description : Welcome to ${app.name}
+			
+Spring Profiles : 
+	Spring Profiles help us maintain environment specific configuration.
+	
+	1 Approach : 
+		Create separate env.specific files.(eg: app-dev.properties, app-test.properties, app-prod.properties)
+		And we can property in same directory where we deploy, jar/war which spring-boot application will pick up/overide, as we saw in above examples.
+		
+	Drawbacks : 
+		prop. file is outside source code control.
+		Manual management across environments.
+	
+	2 Approach : 
+		Spring Profiles solves the same problem of properties being env. specific.
+		Steps : 
+			1. Create property file foll. naming convention : application-<profileName>.extn 
+				eg: application-test.properties, application-dev.properties, application-prod.properties
+			2. set property -> spring.profiles.active=<profileName> in application.properties
+			3. After this run the application specified profile will be picked-up.
+		Note : step-2 instead of hard-coding in application.properties, we can pass it as command-line argument or jvm-argument.
+		
+		Spring profile working : 
+			default profile is always active, i.e. whatever is there in application.properties is always active.
+			When we define : spring.profiles.active=test in application.properties
+			What it means is application-test.properties will sit on top of application.properties.
+			i.e. All the properties in application-test.properties will override properties in application.properties and
+			properties which are not overriden will be picked from application.properties
+			
+			We can also have more than 1 profile active at same time, eg:  application-test.properties, application-stage.properties can be active at same time.
+			It means that application-stage.properties is in addition to what we have in application.properties & application-test.properties. 
+			
+		Note : Common properties across environments can be in application.properties and what are expected to change can be overidden in env. specific files. eg:  application-test.properties, application-stage.properties
+			
+		
+		Selecting Beans by Profile : 
+			eg: 
+				@Repository
+				@Profile("prod")
+				public class ProductionDataSourceBean{
+				
+				}
+				
+				@Repository
+				@Profile("dev")
+				public class LocalDataSourceBean{
+				
+				}
+				
+			Based on which spring profile is active(dev or prod) that particular bean will be activated.
+			On our beans when we don't have any Profile annotation,then its equivalent to @Profile("default") --> i,e all the beans are instantiated.
+			
+Environment Object : 
+	Environment is a bean, which we can inject in our classes and can access  configuration properties using it.
+	To use Environment object auto-wire it from : org.springframework.core.env.Environment class in Application it has methods to access it.
+	
+	Note : Its a bad practice and We should not use this object to retrive env. properties because Environment object does property look-up.
+		  We should use @Value("${}") & @ConfigurationProperties as they do property injection and NOT property look-up.
+	
+Spring Cloud Config :
+	Consistency in configuration is important with micro-services.
+	Therefore Configuration as a separate micrio-service is an option to use.
+	
+	Different solutions availabel : 
+		Apache Zookeeper
+		ETCD - Distributed key-value store
+		Hashicorp Consul
+		Spring cloud configuration server : Most widely used : Stores configuration in GIT repo.
+		
+	Spring cloud configuration server : 
+		Most widely used.
+		Stores configuration properties in GIT repo.
+		
+	Setting Spring cloud config server :
+		create a new Spring starter project.
+		Add dependency to pom.xml : <dependency>
+										<groupId>org.springframework.cloud</groupId>
+										<artifactId>spring-cloud-config-server</artifactId>
+									</dependency>
+		Add @EnableConfigServer to main spring-boot class.
+		Add in application.properties
+			spring.cloud.config.server.git.uri=file://D://configrepo
+			server.port=8888
+		start the server :
+			To access server use url format:http://localhost:8888/<fileName>/<springProfile>
+				eg: http://localhost:8888/application/default
+		
+	
+	Setting Spring cloud config client :
+	Add dependency to pom.xml : 
+								<properties>
+									<java.version>1.8</java.version>
+									<spring-cloud.version>Hoxton.SR5</spring-cloud.version>
+								</properties>
+								<dependency>
+									<groupId>org.springframework.cloud</groupId>
+									<artifactId>spring-cloud-Starter-config</artifactId>
+								</dependency>
+								<dependencyManagement>
+									<dependencies>
+										<dependency>
+											<groupId>org.springframework.cloud</groupId>
+											<artifactId>spring-cloud-dependencies</artifactId>
+											<version>${spring-cloud.version}</version>
+											<type>pom</type>
+											<scope>import</scope>
+										</dependency>
+									</dependencies>
+								</dependencyManagement>
+	Add in application.properties :
+		spring.cloud.config.uri=http://localhost:8888
+	
+	If we want to create micro-service specific configuration files on config server, then follow below steps : 
+		create a property file with micro-service name, eg: spring-boot-config.properties on git server. Naming convention is not rule, just the convention.
+		In micro-service(eg:spring-boot-config) application.properties add : 
+			spring.application.name=spring-boot-config
+			
+	Dynamically refreshing properties at run-time :
+	As we make change in git repo, without Restarting the cloud config server we get the updated value.
+		eg cloud-config-server url : http://localhost:8888/spring-boot-config/default 
+	
+	But client micro-service(spring-boot-config) does not get this updated value till we have not restarted the server.
+	After restarting it gets the latest value.
+	
+	Is there a way to get value without restarting for Client?
+	Yes there is, steps below : 
+		Add dependency :
+			<dependency>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-starter-actuator</artifactId>
+			</dependency>
+			
+		Add @RefereshScope Annotation on class, It tells spring-container, all the dependencies need to be refreshed in this class.
+		
+		To refresh the client microservice, client needs to make Post call: 
+		http://localhost:8080/actuator/refresh
+		
+		Once this call is successful it returns properties that are changed, then properties on client micro-service are refreshed without restarting the server.
+
+Configuration Good Practices : 
+	Specificity : How likely is that configuration going to change.
+			If its micro-service specific and most probably never going to change then we can keep it in property files. If there is a change than application restart will be required.
+			If its most probably going to change often, then we can keep it in config server.
+			
+			If we are using cloud providers like AWS, heuroko etc, they have there environment config system/path variables that needs to be configured.
+			Use Aliases to abstract hosting provider config.
+			eg: 
+				Assume AWS port using : host.environment.port:8080 --> System variable
+				we can define alias--> env.port:${host.environment.port}  --> alias
+				We can use this alias to define property, instead of directly using system variable --> server.port:${env.port} -->using alias 
+	
+	Security : 
+		we can secure spring cloud Config server with Spring Security.
+		
+		What about securing GIT? like api keys, different credentials etc.
+			To achieve this we use encryption. Spring cloud config server has ability to encrypt & decrypt the values.
+		
+	Use intelligent defaults for local development : 
+		So that we can be productive and don't have todo lots of configs just to run the micro-service.
+		eg: @Value("${propertyName:defaultValue}"
+	
+	Reference on how to build micro-services : 12factor.net 
+	
+
+
+
+		
+	
+	
+	
+	
+	
+		
+		
+		
+		
+		
+		
+		
+		
+			
+	
+	
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
